@@ -1,5 +1,120 @@
 # @mastra/core
 
+## 1.0.0-beta.20
+
+### Patch Changes
+
+- Add embedded documentation support for Mastra packages ([#11472](https://github.com/mastra-ai/mastra/pull/11472))
+
+  Mastra packages now include embedded documentation in the published npm package under `dist/docs/`. This enables coding agents and AI assistants to understand and use the framework by reading documentation directly from `node_modules`.
+
+  Each package includes:
+  - **SKILL.md** - Entry point explaining the package's purpose and capabilities
+  - **SOURCE_MAP.json** - Machine-readable index mapping exports to types and implementation files
+  - **Topic folders** - Conceptual documentation organized by feature area
+
+  Documentation is driven by the `packages` frontmatter field in MDX files, which maps docs to their corresponding packages. CI validation ensures all docs include this field.
+
+- Add support for `retries` and `scorers` parameters across all `createStep` overloads.
+  ([#11495](https://github.com/mastra-ai/mastra/pull/11495))
+
+  The `createStep` function now includes support for the `retries` and `scorers` fields across all step creation patterns, enabling step-level retry configuration and AI evaluation support for regular steps, agent-based steps, and tool-based steps.
+
+  ```typescript
+  import { init } from '@mastra/inngest';
+  import { z } from 'zod';
+
+  const { createStep } = init(inngest);
+
+  // 1. Regular step with retries
+  const regularStep = createStep({
+    id: 'api-call',
+    inputSchema: z.object({ url: z.string() }),
+    outputSchema: z.object({ data: z.any() }),
+    retries: 3, // ← Will retry up to 3 times on failure
+    execute: async ({ inputData }) => {
+      const response = await fetch(inputData.url);
+      return { data: await response.json() };
+    },
+  });
+
+  // 2. Agent step with retries and scorers
+  const agentStep = createStep(myAgent, {
+    retries: 3,
+    scorers: [{ id: 'accuracy-scorer', scorer: myAccuracyScorer }],
+  });
+
+  // 3. Tool step with retries and scorers
+  const toolStep = createStep(myTool, {
+    retries: 2,
+    scorers: [{ id: 'quality-scorer', scorer: myQualityScorer }],
+  });
+  ```
+
+  This change ensures API consistency across all `createStep` overloads. All step types now support retry and evaluation configurations.
+
+  This is a non-breaking change - steps without these parameters continue to work exactly as before.
+
+  Fixes #9351
+
+- Remove `streamVNext`, `resumeStreamVNext`, and `observeStreamVNext` methods, call `stream`, `resumeStream` and `observeStream` directly ([#11499](https://github.com/mastra-ai/mastra/pull/11499))
+
+  ```diff
+  + const run = await workflow.createRun({ runId: '123' });
+  - const stream = await run.streamVNext({ inputData: { ... } });
+  + const stream = await run.stream({ inputData: { ... } });
+  ```
+
+- Added `startExclusive` and `endExclusive` options to `dateRange` filter for message queries. ([#11479](https://github.com/mastra-ai/mastra/pull/11479))
+
+  **What changed:** The `filter.dateRange` parameter in `listMessages()` and `Memory.recall()` now supports `startExclusive` and `endExclusive` boolean options. When set to `true`, messages with timestamps exactly matching the boundary are excluded from results.
+
+  **Why this matters:** Enables cursor-based pagination for chat applications. When new messages arrive during a session, offset-based pagination can skip or duplicate messages. Using `endExclusive: true` with the oldest message's timestamp as a cursor ensures consistent pagination without gaps or duplicates.
+
+  **Example:**
+
+  ```typescript
+  // Get first page
+  const page1 = await memory.recall({
+    threadId: 'thread-123',
+    perPage: 10,
+    orderBy: { field: 'createdAt', direction: 'DESC' },
+  });
+
+  // Get next page using cursor-based pagination
+  const oldestMessage = page1.messages[page1.messages.length - 1];
+  const page2 = await memory.recall({
+    threadId: 'thread-123',
+    perPage: 10,
+    orderBy: { field: 'createdAt', direction: 'DESC' },
+    filter: {
+      dateRange: {
+        end: oldestMessage.createdAt,
+        endExclusive: true, // Excludes the cursor message
+      },
+    },
+  });
+  ```
+
+- fix(core): support LanguageModelV3 in MastraModelGateway.resolveLanguageModel ([#11489](https://github.com/mastra-ai/mastra/pull/11489))
+
+- Fixed agent network not returning text response when routing agent handles requests without delegation. ([#11497](https://github.com/mastra-ai/mastra/pull/11497))
+
+  **What changed:**
+  - Agent networks now correctly stream text responses when the routing agent decides to handle a request itself instead of delegating to sub-agents, workflows, or tools
+  - Added fallback in transformers to ensure text is always returned even if core events are missing
+
+  **Why this matters:**
+  Previously, when using `toAISdkV5Stream` or `networkRoute()` outside of the Mastra Studio UI, no text content was returned when the routing agent handled requests directly. This fix ensures consistent behavior across all API routes.
+
+  Fixes #11219
+
+- Fix reasoning content being lost when text-start chunk arrives before reasoning-end ([#11494](https://github.com/mastra-ai/mastra/pull/11494))
+
+  Some model providers (e.g., ZAI/glm-4.6) return streaming chunks where `text-start` arrives before `reasoning-end`. Previously, this would clear the accumulated reasoning deltas, resulting in empty reasoning content in the final message. Now `text-start` is properly excluded from triggering the reasoning state reset, allowing `reasoning-end` to correctly save the reasoning content.
+
+- Fix autoresume not working fine in useChat ([#11486](https://github.com/mastra-ai/mastra/pull/11486))
+
 ## 1.0.0-beta.19
 
 ### Minor Changes

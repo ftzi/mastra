@@ -1,5 +1,62 @@
 # @mastra/inngest
 
+## 1.0.0-beta.11
+
+### Patch Changes
+
+- Add support for `retries` and `scorers` parameters across all `createStep` overloads.
+  ([#11495](https://github.com/mastra-ai/mastra/pull/11495))
+
+  The `createStep` function now includes support for the `retries` and `scorers` fields across all step creation patterns, enabling step-level retry configuration and AI evaluation support for regular steps, agent-based steps, and tool-based steps.
+
+  ```typescript
+  import { init } from '@mastra/inngest';
+  import { z } from 'zod';
+
+  const { createStep } = init(inngest);
+
+  // 1. Regular step with retries
+  const regularStep = createStep({
+    id: 'api-call',
+    inputSchema: z.object({ url: z.string() }),
+    outputSchema: z.object({ data: z.any() }),
+    retries: 3, // ← Will retry up to 3 times on failure
+    execute: async ({ inputData }) => {
+      const response = await fetch(inputData.url);
+      return { data: await response.json() };
+    },
+  });
+
+  // 2. Agent step with retries and scorers
+  const agentStep = createStep(myAgent, {
+    retries: 3,
+    scorers: [{ id: 'accuracy-scorer', scorer: myAccuracyScorer }],
+  });
+
+  // 3. Tool step with retries and scorers
+  const toolStep = createStep(myTool, {
+    retries: 2,
+    scorers: [{ id: 'quality-scorer', scorer: myQualityScorer }],
+  });
+  ```
+
+  This change ensures API consistency across all `createStep` overloads. All step types now support retry and evaluation configurations.
+
+  This is a non-breaking change - steps without these parameters continue to work exactly as before.
+
+  Fixes #9351
+
+- Remove `streamVNext`, `resumeStreamVNext`, and `observeStreamVNext` methods, call `stream`, `resumeStream` and `observeStream` directly ([#11499](https://github.com/mastra-ai/mastra/pull/11499))
+
+  ```diff
+  + const run = await workflow.createRun({ runId: '123' });
+  - const stream = await run.streamVNext({ inputData: { ... } });
+  + const stream = await run.stream({ inputData: { ... } });
+  ```
+
+- Updated dependencies [[`bc72b52`](https://github.com/mastra-ai/mastra/commit/bc72b529ee4478fe89ecd85a8be47ce0127b82a0), [`05b8bee`](https://github.com/mastra-ai/mastra/commit/05b8bee9e50e6c2a4a2bf210eca25ee212ca24fa), [`c042bd0`](https://github.com/mastra-ai/mastra/commit/c042bd0b743e0e86199d0cb83344ca7690e34a9c), [`4f0b3c6`](https://github.com/mastra-ai/mastra/commit/4f0b3c66f196c06448487f680ccbb614d281e2f7), [`74c4f22`](https://github.com/mastra-ai/mastra/commit/74c4f22ed4c71e72598eacc346ba95cdbc00294f), [`81b6a8f`](https://github.com/mastra-ai/mastra/commit/81b6a8ff79f49a7549d15d66624ac1a0b8f5f971), [`251df45`](https://github.com/mastra-ai/mastra/commit/251df4531407dfa46d805feb40ff3fb49769f455), [`12b0cc4`](https://github.com/mastra-ai/mastra/commit/12b0cc4077d886b1a552637dedb70a7ade93528c)]:
+  - @mastra/core@1.0.0-beta.20
+
 ## 1.0.0-beta.10
 
 ### Minor Changes
